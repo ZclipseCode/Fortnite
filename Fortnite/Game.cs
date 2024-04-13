@@ -3,9 +3,10 @@ using OpenTK.Windowing.Desktop;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Graphics.OpenGL4;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 
 // Game class that inherets from the Game Window Class
-internal class Game : GameWindow
+public class Game : GameWindow
 {
     // set of vertices to draw the triangle with (x,y,z) for each vertex
 
@@ -107,6 +108,9 @@ internal class Game : GameWindow
     int textureVBO;
     int ebo;
     int textureID;
+
+    // camera
+    Camera camera;
 
     // transformation variables
     float yRot = 0f;
@@ -235,6 +239,9 @@ internal class Game : GameWindow
         GL.BindTexture(TextureTarget.Texture2D, 0);
 
         GL.Enable(EnableCap.DepthTest);
+
+        camera = new Camera(width, height, Vector3.Zero);
+        CursorState = CursorState.Grabbed;
     }
     // called once when game is closed
     protected override void OnUnload()
@@ -266,8 +273,8 @@ internal class Game : GameWindow
 
         // transformation matrices
         Matrix4 model = Matrix4.Identity;
-        Matrix4 view = Matrix4.Identity;
-        Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(60.0f), width / height, 0.1f, 100.0f);
+        Matrix4 view = camera.GetViewMatrix();
+        Matrix4 projection = camera.GetProjectionMatrix();
 
         model = Matrix4.CreateRotationY(yRot);
         yRot += 0.001f;
@@ -295,7 +302,11 @@ internal class Game : GameWindow
     // called every frame. All updating happens here
     protected override void OnUpdateFrame(FrameEventArgs args)
     {
+        MouseState mouse = MouseState;
+        KeyboardState input = KeyboardState;
+
         base.OnUpdateFrame(args);
+        camera.Update(input, mouse, args);
     }
 
     // Function to load a text file and return its contents as a string
