@@ -1,13 +1,6 @@
 ﻿using StbImageSharp;
 using OpenTK.Windowing.Desktop;
 using OpenTK.Mathematics;
-using OpenTK.Graphics;
-using OpenTK.Windowing.Common;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using OpenTK.Windowing.Common;
 using OpenTK.Graphics.OpenGL4;
 
@@ -15,29 +8,97 @@ using OpenTK.Graphics.OpenGL4;
 internal class Game : GameWindow
 {
     // set of vertices to draw the triangle with (x,y,z) for each vertex
-    float[] vertices =
-    {
-            -0.5f, 0.5f, 0f, // top left vertex - 0
-            0.5f, 0.5f, 0f, // top right vertex - 1
-            0.5f, -0.5f, 0f, // bottom right - 2
-            -0.5f, -0.5f, 0f // bottom left - 3
-        };
 
-    float[] texCoords =
+    List<Vector3> vertices = new List<Vector3>()
     {
-            0f, 1f,
-            1f, 1f,
-            1f, 0f,
-            0f, 0f
-        };
+        // front face
+            new Vector3(-0.5f, 0.5f, 0.5f), // topleft vert
+            new Vector3(0.5f, 0.5f, 0.5f), // topright vert
+            new Vector3(0.5f, -0.5f, 0.5f), // bottomright vert
+            new Vector3(-0.5f, -0.5f, 0.5f), // bottomleft vert
+            // right face
+            new Vector3(0.5f, 0.5f, 0.5f), // topleft vert
+            new Vector3(0.5f, 0.5f, -0.5f), // topright vert
+            new Vector3(0.5f, -0.5f, -0.5f), // bottomright vert
+            new Vector3(0.5f, -0.5f, 0.5f), // bottomleft vert
+            // back face
+            new Vector3(0.5f, 0.5f, -0.5f), // topleft vert
+            new Vector3(-0.5f, 0.5f, -0.5f), // topright vert
+            new Vector3(-0.5f, -0.5f, -0.5f), // bottomright vert
+            new Vector3(0.5f, -0.5f, -0.5f), // bottomleft vert
+            // left face
+            new Vector3(-0.5f, 0.5f, -0.5f), // topleft vert
+            new Vector3(-0.5f, 0.5f, 0.5f), // topright vert
+            new Vector3(-0.5f, -0.5f, 0.5f), // bottomright vert
+            new Vector3(-0.5f, -0.5f, -0.5f), // bottomleft vert
+            // top face
+            new Vector3(-0.5f, 0.5f, -0.5f), // topleft vert
+            new Vector3(0.5f, 0.5f, -0.5f), // topright vert
+            new Vector3(0.5f, 0.5f, 0.5f), // bottomright vert
+            new Vector3(-0.5f, 0.5f, 0.5f), // bottomleft vert
+            // bottom face
+            new Vector3(-0.5f, -0.5f, 0.5f), // topleft vert
+            new Vector3(0.5f, -0.5f, 0.5f), // topright vert
+            new Vector3(0.5f, -0.5f, -0.5f), // bottomright vert
+            new Vector3(-0.5f, -0.5f, -0.5f), // bottomleft vert
+    };
+
+    List<Vector2> texCoords = new List<Vector2>()
+    {
+        new Vector2(0f, 1f),
+        new Vector2(1f, 1f),
+        new Vector2(1f, 0f),
+        new Vector2(0f, 0f),
+
+        new Vector2(0f, 1f),
+        new Vector2(1f, 1f),
+        new Vector2(1f, 0f),
+        new Vector2(0f, 0f),
+
+        new Vector2(0f, 1f),
+        new Vector2(1f, 1f),
+        new Vector2(1f, 0f),
+        new Vector2(0f, 0f),
+
+        new Vector2(0f, 1f),
+        new Vector2(1f, 1f),
+        new Vector2(1f, 0f),
+        new Vector2(0f, 0f),
+
+        new Vector2(0f, 1f),
+        new Vector2(1f, 1f),
+        new Vector2(1f, 0f),
+        new Vector2(0f, 0f),
+
+        new Vector2(0f, 1f),
+        new Vector2(1f, 1f),
+        new Vector2(1f, 0f),
+        new Vector2(0f, 0f),
+    };
 
     uint[] indices =
     {
-            // top triangle
-            0, 1, 2,
-            // bottom triangle
-            2, 3, 0
-        };
+        // first face
+        // top triangle
+        0, 1, 2,
+        // bottom triangle
+        2, 3, 0,
+
+        4, 5, 6,
+        6, 7, 4,
+
+        8, 9, 10,
+        10, 11, 8,
+
+        12, 13, 14,
+        14, 15, 12,
+
+        16, 17, 18,
+        18, 19, 16,
+
+        20, 21, 22,
+        22, 23, 20,
+    };
 
     // Render Pipeline vars
     int vao;
@@ -46,6 +107,9 @@ internal class Game : GameWindow
     int textureVBO;
     int ebo;
     int textureID;
+
+    // transformation variables
+    float yRot = 0f;
 
     // width and height of screen
     int width, height;
@@ -85,7 +149,7 @@ internal class Game : GameWindow
         // bind the buffer as an array buffer
         GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
         // Store data in the vbo
-        GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
+        GL.BufferData(BufferTarget.ArrayBuffer, vertices.Count * Vector3.SizeInBytes, vertices.ToArray(), BufferUsageHint.StaticDraw);
 
 
         // put the vertex VBO in slot 0 of our VAO
@@ -101,7 +165,7 @@ internal class Game : GameWindow
 
         textureVBO = GL.GenBuffer();
         GL.BindBuffer(BufferTarget.ArrayBuffer, textureVBO);
-        GL.BufferData(BufferTarget.ArrayBuffer, texCoords.Length * sizeof(float), texCoords, BufferUsageHint.StaticDraw);
+        GL.BufferData(BufferTarget.ArrayBuffer, texCoords.Count * Vector2.SizeInBytes, texCoords.ToArray(), BufferUsageHint.StaticDraw);
 
 
         // put the texture VBO in slot 1 of our VAO
@@ -169,6 +233,8 @@ internal class Game : GameWindow
         GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, dirtTexture.Width, dirtTexture.Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, dirtTexture.Data);
         // unbind the texture
         GL.BindTexture(TextureTarget.Texture2D, 0);
+
+        GL.Enable(EnableCap.DepthTest);
     }
     // called once when game is closed
     protected override void OnUnload()
@@ -188,7 +254,7 @@ internal class Game : GameWindow
         // Set the color to fill the screen with
         GL.ClearColor(0.3f, 0.3f, 1f, 1f);
         // Fill the screen with the color
-        GL.Clear(ClearBufferMask.ColorBufferBit);
+        GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
 
         // draw our triangle
@@ -197,6 +263,25 @@ internal class Game : GameWindow
         GL.BindBuffer(BufferTarget.ElementArrayBuffer, ebo);
 
         GL.BindTexture(TextureTarget.Texture2D, textureID);
+
+        // transformation matrices
+        Matrix4 model = Matrix4.Identity;
+        Matrix4 view = Matrix4.Identity;
+        Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(60.0f), width / height, 0.1f, 100.0f);
+
+        model = Matrix4.CreateRotationY(yRot);
+        yRot += 0.001f;
+
+        Matrix4 translation = Matrix4.CreateTranslation(0f, 0f, -3f);
+        model *= translation;
+
+        int modelLocation = GL.GetUniformLocation(shaderProgram, "model");
+        int viewLocation = GL.GetUniformLocation(shaderProgram, "view");
+        int projectionLocation = GL.GetUniformLocation(shaderProgram, "projection");
+
+        GL.UniformMatrix4(modelLocation, true, ref model);
+        GL.UniformMatrix4(viewLocation, true, ref view);
+        GL.UniformMatrix4(projectionLocation, true, ref projection);
 
         GL.DrawElements(PrimitiveType.Triangles, indices.Length, DrawElementsType.UnsignedInt, 0);
         //GL.DrawArrays(PrimitiveType.Triangles, 0, 3); // draw the triangle | args = Primitive type, first vertex, last vertex
