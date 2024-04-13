@@ -77,7 +77,7 @@ public class Game : GameWindow
         new Vector2(0f, 0f),
     };
 
-    uint[] indices =
+    List<uint> indices = new List<uint>()
     {
         // first face
         // top triangle
@@ -102,12 +102,10 @@ public class Game : GameWindow
     };
 
     // Render Pipeline vars
-    int vao;
-    int shaderProgram;
-    int vbo;
-    int textureVBO;
-    int ebo;
-    int textureID;
+    VAO vao;
+    IBO ibo;
+    ShaderProgram program;
+    Texture texture;
 
     // camera
     Camera camera;
@@ -140,103 +138,18 @@ public class Game : GameWindow
     {
         base.OnLoad();
 
-        // generate the vbo
-        vao = GL.GenVertexArray();
+        vao = new VAO();
 
-        // bind the vao
-        GL.BindVertexArray(vao);
+        VBO vbo = new VBO(vertices);
+        vao.LinkToVAO(0, 3, vbo);
+        VBO uvVBO = new VBO(texCoords);
+        vao.LinkToVAO(1, 2, uvVBO);
 
-        // --- Vertices VBO ---
+        ibo = new IBO(indices);
 
-        // generate a buffer
-        vbo = GL.GenBuffer();
-        // bind the buffer as an array buffer
-        GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
-        // Store data in the vbo
-        GL.BufferData(BufferTarget.ArrayBuffer, vertices.Count * Vector3.SizeInBytes, vertices.ToArray(), BufferUsageHint.StaticDraw);
+        program = new ShaderProgram("Default.vert", "Default.frag");
 
-
-        // put the vertex VBO in slot 0 of our VAO
-
-        // point slot (0) of the VAO to the currently bound VBO (vbo)
-        GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 0, 0);
-        // enable the slot
-        GL.EnableVertexArrayAttrib(vao, 0);
-
-        GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
-
-        // --- Texture VBO ---
-
-        textureVBO = GL.GenBuffer();
-        GL.BindBuffer(BufferTarget.ArrayBuffer, textureVBO);
-        GL.BufferData(BufferTarget.ArrayBuffer, texCoords.Count * Vector2.SizeInBytes, texCoords.ToArray(), BufferUsageHint.StaticDraw);
-
-
-        // put the texture VBO in slot 1 of our VAO
-
-        // point slot (1) of the VAO to the currently bound VBO (vbo)
-        GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 0, 0);
-        // enable the slot
-        GL.EnableVertexArrayAttrib(vao, 1);
-
-        GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
-
-        // unbind the vbo and vao respectively
-
-        GL.BindVertexArray(0);
-
-
-        ebo = GL.GenBuffer();
-        GL.BindBuffer(BufferTarget.ElementArrayBuffer, ebo);
-        GL.BufferData(BufferTarget.ElementArrayBuffer, indices.Length * sizeof(uint), indices, BufferUsageHint.StaticDraw);
-        GL.BindBuffer(BufferTarget.ElementArrayBuffer, 0);
-
-
-        // create the shader program
-        shaderProgram = GL.CreateProgram();
-
-        // create the vertex shader
-        int vertexShader = GL.CreateShader(ShaderType.VertexShader);
-        // add the source code from "Default.vert" in the Shaders file
-        GL.ShaderSource(vertexShader, LoadShaderSource("Default.vert"));
-        // Compile the Shader
-        GL.CompileShader(vertexShader);
-
-        // Same as vertex shader
-        int fragmentShader = GL.CreateShader(ShaderType.FragmentShader);
-        GL.ShaderSource(fragmentShader, LoadShaderSource("Default.frag"));
-        GL.CompileShader(fragmentShader);
-
-        // Attach the shaders to the shader program
-        GL.AttachShader(shaderProgram, vertexShader);
-        GL.AttachShader(shaderProgram, fragmentShader);
-
-        // Link the program to OpenGL
-        GL.LinkProgram(shaderProgram);
-
-        // delete the shaders
-        GL.DeleteShader(vertexShader);
-        GL.DeleteShader(fragmentShader);
-
-        // --- TEXTURES ---
-        textureID = GL.GenTexture();
-        // activate the texture in the unit
-        GL.ActiveTexture(TextureUnit.Texture0);
-        GL.BindTexture(TextureTarget.Texture2D, textureID);
-
-        // texture parameters
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
-
-        // load image
-        StbImage.stbi_set_flip_vertically_on_load(1);
-        ImageResult dirtTexture = ImageResult.FromStream(File.OpenRead("../../../Textures/Dirt_01-256x256.png"), ColorComponents.RedGreenBlueAlpha);
-
-        GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, dirtTexture.Width, dirtTexture.Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, dirtTexture.Data);
-        // unbind the texture
-        GL.BindTexture(TextureTarget.Texture2D, 0);
+        texture = new Texture("Dirt_01-256x256.png");
 
         GL.Enable(EnableCap.DepthTest);
 
@@ -249,11 +162,10 @@ public class Game : GameWindow
         base.OnUnload();
 
         // Delete, VAO, VBO, Shader Program
-        GL.DeleteVertexArray(vao);
-        GL.DeleteBuffer(vbo);
-        GL.DeleteBuffer(ebo);
-        GL.DeleteTexture(textureID);
-        GL.DeleteProgram(shaderProgram);
+        vao.Delete();
+        ibo.Delete();
+        texture.Delete();
+        program.Delete();
     }
     // called every frame. All rendering happens here
     protected override void OnRenderFrame(FrameEventArgs args)
@@ -263,13 +175,10 @@ public class Game : GameWindow
         // Fill the screen with the color
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-
-        // draw our triangle
-        GL.UseProgram(shaderProgram); // bind vao
-        GL.BindVertexArray(vao); // use shader program
-        GL.BindBuffer(BufferTarget.ElementArrayBuffer, ebo);
-
-        GL.BindTexture(TextureTarget.Texture2D, textureID);
+        program.Bind();
+        vao.Bind();
+        ibo.Bind();
+        texture.Bind();
 
         // transformation matrices
         Matrix4 model = Matrix4.Identity;
@@ -282,15 +191,20 @@ public class Game : GameWindow
         Matrix4 translation = Matrix4.CreateTranslation(0f, 0f, -3f);
         model *= translation;
 
-        int modelLocation = GL.GetUniformLocation(shaderProgram, "model");
-        int viewLocation = GL.GetUniformLocation(shaderProgram, "view");
-        int projectionLocation = GL.GetUniformLocation(shaderProgram, "projection");
+        int modelLocation = GL.GetUniformLocation(program.id, "model");
+        int viewLocation = GL.GetUniformLocation(program.id, "view");
+        int projectionLocation = GL.GetUniformLocation(program.id, "projection");
 
         GL.UniformMatrix4(modelLocation, true, ref model);
         GL.UniformMatrix4(viewLocation, true, ref view);
         GL.UniformMatrix4(projectionLocation, true, ref projection);
 
-        GL.DrawElements(PrimitiveType.Triangles, indices.Length, DrawElementsType.UnsignedInt, 0);
+        GL.DrawElements(PrimitiveType.Triangles, indices.Count, DrawElementsType.UnsignedInt, 0);
+
+        model = Matrix4.CreateTranslation(new Vector3(2f, 0f, 0f));
+        GL.UniformMatrix4(modelLocation, true, ref model);
+        GL.DrawElements(PrimitiveType.Triangles, indices.Count, DrawElementsType.UnsignedInt, 0);
+
         //GL.DrawArrays(PrimitiveType.Triangles, 0, 3); // draw the triangle | args = Primitive type, first vertex, last vertex
 
 
@@ -308,25 +222,4 @@ public class Game : GameWindow
         base.OnUpdateFrame(args);
         camera.Update(input, mouse, args);
     }
-
-    // Function to load a text file and return its contents as a string
-    public static string LoadShaderSource(string filePath)
-    {
-        string shaderSource = "";
-
-        try
-        {
-            using (StreamReader reader = new StreamReader("../../../Shaders/" + filePath))
-            {
-                shaderSource = reader.ReadToEnd();
-            }
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine("Failed to load shader source file: " + e.Message);
-        }
-
-        return shaderSource;
-    }
-
 }
